@@ -72,7 +72,7 @@ def fix_sector():
             exit
         else:
             output = subprocess.check_output(["hdparm", "--yes-i-know-what-i-am-doing", "--repair-sector", str(sector), device])
-            print(output)
+            print(f"{output}")
 
 # MAIN
 variables()
