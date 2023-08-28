@@ -62,6 +62,9 @@ def get_smart():
 
 def fix_sector():
     global sector
+    if sector == 0 :
+        raise Exception("Zero sector number")
+
     debug_print(f"fix_sector {sector}")
     if DEBUG:
         choice = input(f"Fix sector {sector}? (Y/n/x): ")
@@ -69,10 +72,11 @@ def fix_sector():
             print("Skipping sector fix.")
             return
         elif choice.lower() == 'x':
+            raise Exception("exit")
             exit
-        else:
-            output = subprocess.check_output(["hdparm", "--yes-i-know-what-i-am-doing", "--repair-sector", str(sector), device])
-            print(f"{output}")
+    else:
+        output = subprocess.check_output(["hdparm", "--yes-i-know-what-i-am-doing", "--repair-sector", str(sector), device])
+        print(output)
 
 # MAIN
 variables()
