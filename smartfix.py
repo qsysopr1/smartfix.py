@@ -4,6 +4,7 @@ import subprocess
 import time
 import sys
 import json
+import warnings
 
 def variables():
     global yn, pendline, sector, pendcount, device, DEBUG
@@ -74,9 +75,19 @@ def fix_sector():
         elif choice.lower() == 'x':
             raise Exception("exit")
             exit
-    else:
-        output = subprocess.check_output(["hdparm", "--yes-i-know-what-i-am-doing", "--repair-sector", str(sector), device])
-        print(output)
+    try:
+        # Run the hdparm repair command
+        output = subprocess.check_output(
+            ["hdparm", "--yes-i-know-what-i-am-doing", "--repair-sector", str(sector), device],
+            stderr=subprocess.STDOUT  # Capture both stdout and stderr
+        )
+        # Decode and print the output
+        print(output.decode('utf-8'))
+    
+    except subprocess.CalledProcessError as e:
+        # Handle the error condition by capturing the exit code and output
+        print(f"Error repairing sector {sector}: Exit code {e.returncode}")
+        print(f"Command output: {e.output.decode('utf-8')}")
 
 # MAIN
 variables()
@@ -101,8 +112,16 @@ while pendcounter > 0:
     print(f"{pendcount}\t{pendline}\t{sector}")
     fix_sector()
     pendcounter -= 1
-    if pendcounter == 0:
+    
+    # Ensure we get the latest SMART data and sector information
+    try:
+        get_smart()
+        if sector == 0:
+            print("No new pending sectors to fix.")
+            break  # Exit if no new sectors are found
+    except Exception as e:
+        print(f"Error: {str(e)}")
         break
-    get_smart()
 
-exit()
+if DEBUG:
+    print("Debug mode complete.")
