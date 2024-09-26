@@ -7,12 +7,13 @@ import json
 import warnings
 
 def variables():
-    global yn, pendline, sector, pendcount, device, DEBUG
+    global yn, pendline, sector, lastsector, pendcount, device, DEBUG
     yn = ""
     pendline = ""
-    sector = 0
+    sector = 0  
+    lastsector = -1
     pendcount = -1
-    DEBUG = True
+    DEBUG = False
 
 def debug_print(message):
     if DEBUG:
@@ -22,7 +23,29 @@ def get_smart():
     global yn, pendcount, pendline, sector
     process = subprocess.Popen(["smartctl", "-t", "short", device], stdout=subprocess.PIPE)
     process.wait()
-    time.sleep(4)
+    while True:
+        time.sleep(4)
+        process = subprocess.Popen(["smartctl", "-A", "-l", "selftest", "-j", device], stdout=subprocess.PIPE)
+        output, _ = process.communicate()
+        smart_data = json.loads(output)
+        # Check if a self-test is in progress
+        try:
+            status_message = smart_data['ata_smart_self_test_log']['standard']['table'][0]['status']['string']
+            if "Self-test routine in progress" in status_message:
+                print("Self-test is still running, waiting...")
+                continue  # Continue the loop until the test completes
+            else:
+                print(f"Self-test status: {status_message}")
+                # Check if the self-test completed without error
+                if "Completed without error" in status_message:
+                    print("Self-test completed without error. No sectors to fix.")
+                    sector = 0  # Reset sector if no error
+                    pendcount = 0  # Reset pending sector count
+                    return  # Exit as there are no issues to fix
+                break  # Exit the loop once the self-test is complete
+        except KeyError:
+            print("Error: Self-test status not found.")
+            break  # Exit the loop if no status is found, or handle the error accordingly
     
     process = subprocess.Popen(["smartctl", "-A", "-l", "selftest", "-j", device], stdout=subprocess.PIPE)
     output, _ = process.communicate()
@@ -59,14 +82,18 @@ def get_smart():
     yn = "No pending sectors or read failures found"
     debug_print(yn)
 
-    # Debug output to see intermediate values
-
 def fix_sector():
-    global sector
-    if sector == 0 :
+    global sector, lastsector
+    if sector == 0:
         raise Exception("Zero sector number")
-
+    
+    # Check if the same sector was corrected in the previous iteration
+    if sector == lastsector:
+        print(f"Skipping sector {sector}: already corrected in the previous iteration.")
+        return
+    
     debug_print(f"fix_sector {sector}")
+    
     if DEBUG:
         choice = input(f"Fix sector {sector}? (Y/n/x): ")
         if choice.lower() == 'n':
@@ -74,7 +101,7 @@ def fix_sector():
             return
         elif choice.lower() == 'x':
             raise Exception("exit")
-            exit
+    
     try:
         # Run the hdparm repair command
         output = subprocess.check_output(
@@ -82,7 +109,14 @@ def fix_sector():
             stderr=subprocess.STDOUT  # Capture both stdout and stderr
         )
         # Decode and print the output
-        print(output.decode('utf-8'))
+        decoded_output = output.decode('utf-8')
+        print(decoded_output)
+
+        # Log the output using logger with filename
+        subprocess.run(["logger", f"[{__file__}] {decoded_output}"])
+
+        # Store the sector as the last corrected sector
+        lastsector = sector
     
     except subprocess.CalledProcessError as e:
         # Handle the error condition by capturing the exit code and output
