@@ -19,6 +19,26 @@ def debug_print(message):
     if DEBUG:
         print(message)
 
+def print_disclaimer():
+    disclaimer = """
+    *******************************************************
+    DISCLAIMER: 
+    This script performs low-level disk repairs using the hdparm 
+    utility. Repairing disk sectors at this level carries inherent 
+    risks. If the wrong sectors are corrected or if disk sectors 
+    fail during the repair process, this could result in data loss 
+    or corruption.
+
+    Use this script at your own risk. It is strongly recommended 
+    to ensure that all important data on the disk is backed up 
+    before proceeding.
+
+    The author of this script assumes no responsibility for any 
+    damage, data loss, or corruption that may occur.
+    *******************************************************
+    """
+    print(disclaimer)
+
 def get_smart():
     global yn, pendcount, pendline, sector
     process = subprocess.Popen(["smartctl", "-t", "short", device], stdout=subprocess.PIPE)
@@ -124,6 +144,7 @@ def fix_sector():
         print(f"Command output: {e.output.decode('utf-8')}")
 
 # MAIN
+print_disclaimer()
 variables()
 device = "/dev/sda" if len(sys.argv) < 2 else sys.argv[1]
 
